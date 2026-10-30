@@ -13,6 +13,7 @@
 .claude/*
 .codex/*
 .agents/
+.worktrees/*
 
 # ── AI agents: other tools — uncomment what you use ───────────────────────────
 # .cursor/*
@@ -42,6 +43,8 @@
 credentials.json
 secrets.json
 secrets.enc
+*-token.txt
+*.token
 
 # ── Python (uv) ───────────────────────────────────────────────────────────────
 __pycache__/
@@ -286,10 +289,9 @@ logs/
 # Everything after this section overrides templates, which is the point.
 
 # ── Project-specific — fill in, delete the rest ───────────────────────────────
-# Local-only, never leaves this machine: OCI/SSH credentials, the private venv
-# that holds OCI CLI, and all runtime logs/state.
+# Local-only, never leaves this machine: OCI/SSH credentials and all runtime
+# logs/state.
 .secrets/
-.venv/
 var/
 
 # ── Re-includes ───────────────────────────────────────────────────────────────
@@ -302,7 +304,8 @@ var/
 !.claude/
 !.claude/settings.json
 !.claude/commands/
-!.codex/hooks.json
+!.worktrees/
+!.worktrees/.gitkeep
 !.vscode/
 !.vscode/settings.json
 !.vscode/tasks.json
@@ -342,7 +345,17 @@ var/
 # Test fixtures — small by definition, and the tests need them in git
 !**/fixtures/
 !**/fixtures/**/
-!**/fixtures/**
+!**/fixtures/**/*.csv
+!**/fixtures/**/*.tsv
+!**/fixtures/**/*.parquet
+!**/fixtures/**/*.png
+!**/fixtures/**/*.jpg
+!**/fixtures/**/*.jpeg
+!**/fixtures/**/*.webp
+!**/fixtures/**/*.gif
+!**/fixtures/**/*.ico
+!**/fixtures/**/*.zip
+!**/fixtures/**/*.bin
 
 # ── Project overrides — ignores that must beat the re-includes above ──────────
 # docs/session-logs/

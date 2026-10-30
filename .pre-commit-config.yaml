@@ -1,0 +1,108 @@
+# Git hooks — one file, blocks marked by stack.
+#
+# Copy to <project>/.pre-commit-config.yaml, DELETE the blocks that do not apply,
+# fill in the scopes, then:
+#
+#   git config --local core.autocrlf false     # or mixed-line-ending loops forever
+#   prek install                               # or: uv run pre-commit install
+#   prek run --all-files                       # build environments before first commit
+#
+# DELETE blocks, do not comment them out — prek's check-yaml rejects long runs of
+# comment lines (j178/prek#2501).
+#
+# After editing, verify the file is sane:
+#   prek run --hook-stage manual --all-files
+
+minimum_pre_commit_version: "4.0.0"
+default_install_hook_types: [pre-commit, commit-msg, pre-push]
+default_stages: [pre-commit]
+
+repos:
+# ── CORE — mandatory, works in any repo, do not delete ────────────────────────
+
+  - repo: meta
+    hooks:
+      - id: check-hooks-apply
+        stages: [manual]
+      - id: check-useless-excludes
+        stages: [manual]
+
+  - repo: https://github.com/pre-commit/pre-commit-hooks
+    rev: v6.0.0
+    hooks:
+      # Fixes the file, then fails the commit. Run `git add` and commit again.
+      - id: trailing-whitespace
+      - id: end-of-file-fixer
+      - id: mixed-line-ending
+        args: [--fix=lf]
+      - id: fix-byte-order-marker
+      # Refuses only, changes nothing.
+      - id: check-yaml
+      - id: check-json
+      - id: check-merge-conflict
+      - id: check-added-large-files
+        args: [--maxkb=1024]
+      - id: check-case-conflict
+      - id: check-illegal-windows-names
+      - id: detect-private-key
+      - id: forbid-submodules
+      - id: destroyed-symlinks
+
+  - repo: https://github.com/pre-commit/pygrep-hooks
+    rev: v1.10.0
+    hooks:
+      # U+FFFD is what a botched encoding leaves behind.
+      - id: text-unicode-replacement-char
+
+  - repo: https://github.com/crate-ci/typos
+    rev: v1.49.0
+    hooks:
+      # Fixes typos on its own. Its dictionary is English only.
+      - id: typos
+        exclude: \.md$
+
+  # Replaces every hand-written commit validator. Fill in --scopes.
+  # It rejects `Revert "..."`, which git writes itself. After git revert,
+  # rewrite the subject as revert(scope): ... — `revert` is on the type list.
+  - repo: https://github.com/compilerla/conventional-pre-commit
+    rev: v4.4.0
+    hooks:
+      - id: conventional-pre-commit
+        stages: [commit-msg]
+        args:
+          - --force-scope
+          - --scopes=repo
+          - feat
+          - fix
+          - chore
+          - docs
+          - refactor
+          - test
+          - perf
+          - style
+          - ci
+          - build
+          - revert
+
+# ── OWN STANDARDS — delete if the repo does not follow them ───────────────────
+# Scope lives in the published hook definitions; do not repeat files/types here.
+
+  - repo: https://github.com/MattyMroz/agents
+    rev: hooks-v1.1.0 # or newer: prek autoupdate
+    hooks:
+      # Commit body: summary + Validation block bound to recorded runs.
+      # Format and the mm-validate workflow: presets/hooks/references/commit-message.md
+      - id: commit-validation
+
+# ── MARKDOWN — delete unless the repo carries prose worth formatting ──────────
+
+  - repo: https://github.com/hukkin/mdformat
+    rev: 0.7.22
+    hooks:
+      - id: mdformat
+        args: [--number]
+        # Without these plugins it wrecks GFM tables.
+        additional_dependencies:
+          - mdformat-gfm==0.4.1
+          - mdformat-tables==1.0.0
+          - mdformat-frontmatter==2.0.8
