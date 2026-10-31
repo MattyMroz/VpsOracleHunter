@@ -20,7 +20,7 @@ slot opens up.
 ## 🎯 Target instance
 
 | Parameter     | Value                          |
-|---------------|--------------------------------|
+| ------------- | ------------------------------ |
 | Shape         | `VM.Standard.A1.Flex`          |
 | OCPU / RAM    | 2 / 12 GB                      |
 | Architecture  | ARM64 (Ampere)                 |
