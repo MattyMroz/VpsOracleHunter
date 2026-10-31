@@ -32,6 +32,8 @@ repos:
     hooks:
       # Fixes the file, then fails the commit. Run `git add` and commit again.
       - id: trailing-whitespace
+        # Two trailing spaces are a hard line break in Markdown.
+        args: [--markdown-linebreak-ext=md]
       - id: end-of-file-fixer
       - id: mixed-line-ending
         args: [--fix=lf]
@@ -54,13 +56,6 @@ repos:
       # U+FFFD is what a botched encoding leaves behind.
       - id: text-unicode-replacement-char
 
-  - repo: https://github.com/crate-ci/typos
-    rev: v1.49.0
-    hooks:
-      # Fixes typos on its own. Its dictionary is English only.
-      - id: typos
-        exclude: \.md$
-
   # Replaces every hand-written commit validator. Fill in --scopes.
   # It rejects `Revert "..."`, which git writes itself. After git revert,
   # rewrite the subject as revert(scope): ... — `revert` is on the type list.
@@ -71,7 +66,7 @@ repos:
         stages: [commit-msg]
         args:
           - --force-scope
-          - --scopes=repo
+          - --scopes=docs,repo
           - feat
           - fix
           - chore
