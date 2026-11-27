@@ -5,6 +5,7 @@ on:
     branches: [main]
   pull_request:
     branches: [main]
+    types: [opened, edited, synchronize, reopened]
   workflow_dispatch:
 
 permissions:
@@ -21,49 +22,49 @@ defaults:
 jobs:
   hooks:
     name: Hooks
-    runs-on: ubuntu-latest
+    runs-on: ${{ vars.CI_RUNNER_LINUX || 'ubuntu-latest' }}
     timeout-minutes: 30
     steps:
-      - uses: actions/checkout@v7
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           fetch-depth: 0
           persist-credentials: false
 
-      - uses: j178/prek-action@v3.1.0
+      - uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0 # v7.1.0
         with:
-          prek-version: 0.5.4
+          python-version: "3.15"
+
+      - uses: j178/prek-action@7b101f8338a08d2bd6fdb3625e4e7692428763a3 # v3.1.1
+        with:
+          prek-version: 0.5.10
           install-only: true
 
+      # - uses: actions-rust-lang/setup-rust-toolchain@a188e68d0fd2bd36ad51dccb2b07ba6e75105f30 # v2.0.1
+      #   with:
+      #     components: rustfmt
+      #     cache: false
+
       - name: Pull request messages
-        if: github.event_name == 'pull_request' && !endsWith(github.event.pull_request.user.login, '[bot]')
+        if: github.event_name == 'pull_request'
         env:
           TITLE: ${{ github.event.pull_request.title }}
           BODY: ${{ github.event.pull_request.body }}
-          BASE: ${{ github.event.pull_request.base.sha }}
-          HEAD: ${{ github.event.pull_request.head.sha }}
+          GIT_EDITOR: ":"
+          COMMIT_MESSAGE_FINAL: "1"
         run: |
-          failed=0
           printf '%s\n\n%s\n' "$TITLE" "$BODY" > "$RUNNER_TEMP/message"
           if ! prek run --stage commit-msg --commit-msg-filename "$RUNNER_TEMP/message"; then
             echo "::error::pull request title or description breaks the commit message rules"
-            failed=1
+            exit 1
           fi
-          shas=$(git rev-list --no-merges "$BASE..$HEAD")
-          for sha in $shas; do
-            case "$(git log -1 --format=%an "$sha")" in *'[bot]') continue ;; esac
-            git log -1 --format=%B "$sha" > "$RUNNER_TEMP/message"
-            if ! prek run --stage commit-msg --commit-msg-filename "$RUNNER_TEMP/message"; then
-              echo "::error::commit $sha breaks the commit message rules"
-              failed=1
-            fi
-          done
-          exit "$failed"
 
       - name: Pushed commits
         if: github.event_name == 'push'
         env:
           BEFORE: ${{ github.event.before }}
           AFTER: ${{ github.event.after }}
+          GIT_EDITOR: ":"
+          COMMIT_MESSAGE_FINAL: "1"
         run: |
           case "$BEFORE" in
             *[!0]*) range="$BEFORE..$AFTER" ;;
@@ -79,7 +80,6 @@ jobs:
           failed=0
           shas=$(git rev-list --no-merges "$range")
           for sha in $shas; do
-            case "$(git log -1 --format=%an "$sha")" in *'[bot]') continue ;; esac
             git log -1 --format=%B "$sha" > "$RUNNER_TEMP/message"
             if ! prek run --stage commit-msg --commit-msg-filename "$RUNNER_TEMP/message"; then
               echo "::error::commit $sha breaks the commit message rules"
@@ -90,5 +90,76 @@ jobs:
 
       - name: Commit hooks
         env:
-          SKIP: no-commit-to-branch
+          SKIP: no-commit-to-branch,changed-tests,changed-tests-bun,changed-tests-rust
         run: prek run --all-files --show-diff-on-failure
+
+  # check:
+  #   name: Check (${{ matrix.os }})
+  #   if: github.event_name != 'push'
+  #   strategy:
+  #     fail-fast: false
+  #     matrix:
+  #       os:
+  #         - ubuntu-latest
+  #         - windows-latest
+  #   runs-on: ${{ matrix.os == 'ubuntu-latest' && vars.CI_RUNNER_LINUX || matrix.os == 'windows-latest' && vars.CI_RUNNER_WINDOWS || matrix.os }}
+  #   timeout-minutes: 30
+  #   env:
+  #     RANGE: ${{ github.event_name == 'pull_request' && format('--from-ref {0} --to-ref HEAD', github.event.pull_request.base.sha) || '--all-files' }}
+  #   steps:
+  #     - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+  #       with:
+  #         fetch-depth: 0
+  #         persist-credentials: false
+
+  #     - uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0 # v7.1.0
+  #       with:
+  #         python-version: "3.15"
+
+  #     - uses: j178/prek-action@7b101f8338a08d2bd6fdb3625e4e7692428763a3 # v3.1.1
+  #       with:
+  #         prek-version: 0.5.10
+  #         install-only: true
+
+  #     - uses: astral-sh/setup-uv@68559e99cc807c1eb7e9238fd43a15bba460eec2 # v10.3.3
+
+  #     - name: Python dependencies
+  #       run: uv sync --locked
+
+  #     - uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2.2.0
+
+  #     - uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+  #       with:
+  #         path: ~/.bun/install/cache
+  #         key: bun-${{ runner.os }}-${{ hashFiles('bun.lock') }}
+
+  #     - name: Bun dependencies
+  #       run: bun install --frozen-lockfile
+
+  #     - uses: actions-rust-lang/setup-rust-toolchain@a188e68d0fd2bd36ad51dccb2b07ba6e75105f30 # v2.0.1
+  #       with:
+  #         components: clippy
+
+  #     - name: Rust dependencies
+  #       run: cargo fetch --locked
+
+  #     # Next language: add its setup and dependency steps above this line.
+
+  #     - name: Push gates
+  #       env:
+  #         SKIP: ship-push,commit-message-push
+  #       run: prek run --stage pre-push $RANGE --show-diff-on-failure
+
+  #     - name: Heavy tests
+  #       run: prek run --stage manual $RANGE --show-diff-on-failure
+
+  #     - name: Dependency audit
+  #       run: |
+  #         uv export --locked --all-groups --no-emit-project --format requirements.txt --output-file "$RUNNER_TEMP/requirements.txt"
+  #         sed -E -i 's/^([A-Za-z0-9._-]+==[^ ;+]+)\+[^ ;]+/\1/' "$RUNNER_TEMP/requirements.txt"
+  #         uvx pip-audit@2.10.1 --requirement "$RUNNER_TEMP/requirements.txt" --disable-pip --strict --progress-spinner off
+
+  #     - name: Bun dependency audit
+  #       run: bun audit
+
+  #     # Rust has no dependency audit here: cargo audit is a separate install and reads the RustSec database from GitHub.

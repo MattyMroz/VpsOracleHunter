@@ -1,6 +1,8 @@
-minimum_pre_commit_version: "4.0.0"
+minimum_prek_version: "0.5.10"
 default_install_hook_types: [pre-commit, commit-msg, pre-push]
 default_stages: [pre-commit]
+default_language_version:
+  python: python3.15
 exclude: ^\.hooks/
 
 repos:
@@ -21,6 +23,7 @@ repos:
         stages: [pre-commit]
       - id: mixed-line-ending
         args: [--fix=lf]
+        # exclude: \.(bat|cmd)$
       - id: fix-byte-order-marker
       - id: check-yaml
       - id: check-merge-conflict
@@ -29,31 +32,33 @@ repos:
         stages: [pre-commit]
       - id: check-case-conflict
       - id: check-illegal-windows-names
+      - id: check-shebang-scripts-are-executable
+        stages: [pre-commit]
       - id: detect-private-key
       - id: forbid-submodules
       - id: destroyed-symlinks
         stages: [pre-commit]
       - id: check-json
+        # exclude: (^|/)\.vscode/|(tsconfig[^/]*|biome)\.json$
+      # - id: check-toml
+      # - id: check-symlinks
+      # - id: check-ast
+      # - id: debug-statements
+      - id: no-commit-to-branch
 
-  - repo: https://github.com/compilerla/conventional-pre-commit
-    rev: v4.4.0
+  - repo: https://github.com/zizmorcore/zizmor-pre-commit
+    rev: v1.32.0
     hooks:
-      - id: conventional-pre-commit
-        stages: [commit-msg]
-        args:
-          - --force-scope
-          - --scopes=docs,repo
-          - feat
-          - fix
-          - chore
-          - docs
-          - refactor
-          - test
-          - perf
-          - style
-          - ci
-          - build
-          - revert
+      - id: zizmor
+        args: [--no-progress, --offline]
+
+  # - repo: https://github.com/crate-ci/typos
+  #   rev: v1.49.0
+  #   hooks:
+      # - id: typos
+      #   args: [--force-exclude]
+      #   types_or: [python, pyi, javascript, jsx, ts, tsx, css, rust, shell]
+      #   stages: [pre-commit]
 
   - repo: https://github.com/hukkin/mdformat
     rev: 0.7.22
@@ -65,20 +70,221 @@ repos:
           - mdformat-tables==1.0.0
           - mdformat-frontmatter==2.0.8
 
+  # - repo: https://github.com/astral-sh/ruff-pre-commit
+  #   rev: v0.17.6
+  #   hooks:
+      # - id: ruff-check
+      #   args: [--fix]
+      # - id: ruff-format
+      #   types_or: [python, pyi, jupyter]
+
+  # - repo: https://github.com/biomejs/pre-commit
+  #   rev: v2.5.7
+  #   hooks:
+      # - id: biome-check
+      #   exclude: ^\.claude/settings\.json$
+
   - repo: local
     hooks:
-      - id: no-replacement-char
-        name: no U+FFFD replacement character
+      - id: no-broken-encoding
+        name: no broken encoding (U+FFFD or mojibake)
         entry: python .hooks/text_guard.py
         language: python
         types: [text]
+      - id: ascii-only
+        name: source must be ASCII
+        entry: python .hooks/text_guard.py --ascii
+        language: python
+        types: [text]
+        exclude: (?i)(^|/)(README|AGENTS|CHANGELOG)\.md$|^docs/|^\.(gitignore|gitattributes|pre-commit-config\.yaml)$
       - id: no-secret-tokens
         name: no API tokens in tracked files
         entry: python .hooks/secret_tokens.py
         language: python
         types: [text]
-      - id: no-ai-trailers
-        name: no AI attribution in the commit message
-        entry: python .hooks/ai_trailers.py
+      - id: no-secret-tokens-push
+        name: no API tokens or private keys in pushed commits
+        entry: python .hooks/secret_tokens.py --pre-push
+        language: python
+        pass_filenames: false
+        always_run: true
+        stages: [pre-push]
+      - id: commit-message
+        name: commit message meets the commit standard
+        entry: python .hooks/commit_message.py --scopes=docs
         language: python
         stages: [commit-msg]
+      - id: commit-message-push
+        name: pushed commit messages meet the commit standard
+        entry: python .hooks/commit_message.py --scopes=docs --pre-push
+        language: python
+        pass_filenames: false
+        always_run: true
+        stages: [pre-push]
+      - id: ship-push
+        name: pushed refs follow the change path
+        entry: python .hooks/push_check.py
+        language: python
+        pass_filenames: false
+        always_run: true
+        stages: [pre-push]
+      # - id: const-docstrings
+      #   name: docstring under every constant
+      #   entry: python .hooks/const_docstrings.py
+      #   language: python
+      #   types: [python]
+      # - id: docstring-policy
+      #   name: docstrings follow the repository policy
+      #   entry: python .hooks/docstring_policy.py --policy=one-line
+      #   language: python
+      #   types: [python]
+      # - id: no-test-prose
+      #   name: no comments or prose in tests
+      #   entry: python .hooks/prose_guard.py
+      #   language: python
+      #   files: \.(py|ts|tsx|js|jsx|mjs|cjs|mts|cts)$
+      # - id: no-mutating-assign
+      #   name: no assignment that mutates its own target container
+      #   entry: python .hooks/mutating_assign.py
+      #   language: python
+      #   types: [python]
+      # Python: runs the changed fast test files at commit. Set files to the fast test files and exclude to the slow
+      # ones (end-to-end, integration, GPU). CI skips this hook, because the pytest hook runs every test there.
+      # changed_tests.py drops the git variables of the commit, so tests that call git stay in their own repo.
+      # - id: changed-tests
+      #   name: changed fast test files
+      #   entry: python .hooks/changed_tests.py uv run pytest --
+      #   language: python
+      #   files: ^tests/(.*/)?test_[^/]*\.py$
+      #   exclude: ^tests/(e2e|integration)/
+      # - id: mypy
+      #   name: mypy
+      #   entry: uv run mypy
+      #   language: system
+      #   pass_filenames: false
+      #   include_deleted: true
+      #   exclude: ^docs/
+      #   stages: [manual]
+      # - id: mypy-linux
+      #   name: mypy (linux target)
+      #   entry: uv run mypy --platform linux
+      #   language: system
+      #   pass_filenames: false
+      #   include_deleted: true
+      #   exclude: ^docs/
+      #   stages: [manual]
+      # - id: lint-imports
+      #   name: import-linter
+      #   entry: uv run lint-imports
+      #   language: system
+      #   pass_filenames: false
+      #   include_deleted: true
+      #   exclude: ^docs/
+      #   stages: [manual]
+      # - id: pytest
+      #   name: pytest
+      #   entry: uv run pytest
+      #   language: system
+      #   pass_filenames: false
+      #   include_deleted: true
+      #   exclude: ^docs/
+      #   stages: [manual]
+      # Bun: runs the changed fast test files at commit. Set files to the fast test files and exclude to the slow ones
+      # (end-to-end, browser). CI skips this hook, because the test hook runs every test there.
+      # - id: changed-tests-bun
+      #   name: changed fast test files
+      #   entry: python .hooks/changed_tests.py bun test --
+      #   language: python
+      #   files: \.(test|spec)\.(ts|tsx|js|jsx)$
+      #   exclude: (^|/)(e2e|browser)/
+      # - id: typecheck
+      #   name: typecheck
+      #   entry: bun run typecheck
+      #   language: system
+      #   pass_filenames: false
+      #   include_deleted: true
+      #   exclude: ^docs/
+      #   stages: [manual]
+      # - id: lint
+      #   name: lint
+      #   entry: bun run lint
+      #   language: system
+      #   pass_filenames: false
+      #   include_deleted: true
+      #   exclude: ^docs/
+      #   stages: [manual]
+      # - id: test
+      #   name: unit tests
+      #   entry: bun run test
+      #   language: system
+      #   pass_filenames: false
+      #   include_deleted: true
+      #   exclude: ^docs/
+      #   stages: [manual]
+      # - id: build
+      #   name: build
+      #   entry: bun run build
+      #   language: system
+      #   pass_filenames: false
+      #   include_deleted: true
+      #   exclude: ^docs/
+      #   stages: [manual]
+      - id: test-weakening
+        name: signals of weakened tests and checks
+        entry: python .hooks/weakening_guard.py
+        language: python
+        pass_filenames: false
+        always_run: true
+        verbose: true
+        stages: [manual]
+      # - id: browsers
+      #   name: playwright browsers
+      #   entry: bun run --cwd . playwright install --with-deps chromium webkit
+      #   language: system
+      #   pass_filenames: false
+      #   include_deleted: true
+      #   exclude: ^docs/
+      #   stages: [manual]
+      # - id: browser-tests
+      #   name: browser tests
+      #   entry: bun run --cwd . test:browser
+      #   language: system
+      #   pass_filenames: false
+      #   include_deleted: true
+      #   exclude: ^docs/
+      #   stages: [manual]
+      # Rust: checks the formatting of the whole crate when a .rs file changes. A Cargo workspace adds --all to entry.
+      # - id: cargo-fmt
+      #   name: cargo fmt
+      #   entry: cargo fmt --check
+      #   language: system
+      #   types: [rust]
+      #   pass_filenames: false
+      # Rust: runs each changed fast tests/<name>.rs alone at commit, because cargo picks a test by name. Set
+      # exclude to the slow test files. CI skips this hook, because the cargo-test hook runs every test there.
+      # - id: changed-tests-rust
+      #   name: changed fast test files
+      #   entry: python .hooks/changed_tests.py cargo test --test {stem} --
+      #   language: python
+      #   files: ^tests/[^/]*\.rs$
+      #   exclude: ^tests/e2e_[^/]*\.rs$
+      # Rust: lints every target in CI. A Cargo workspace adds --workspace to entry, features go there too.
+      # - id: cargo-clippy
+      #   name: cargo clippy
+      #   entry: cargo clippy --all-targets -- -D warnings
+      #   language: system
+      #   pass_filenames: false
+      #   include_deleted: true
+      #   exclude: ^docs/
+      #   stages: [manual]
+      # Rust: runs every test in CI. A Cargo workspace adds --workspace to entry, features go there too.
+      # - id: cargo-test
+      #   name: cargo test
+      #   entry: cargo test
+      #   language: system
+      #   pass_filenames: false
+      #   include_deleted: true
+      #   exclude: ^docs/
+      #   stages: [manual]
+      # Next language: add its section above this line, in the form of the sections above.
+      # Repository: hooks of this repository only go below this line.
